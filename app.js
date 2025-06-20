@@ -1,12 +1,17 @@
 import fs from "node:fs/promises";
-
-import bodyParser from "body-parser";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
+import bodyParser from "body-parser";
 
 const app = express();
 
+// Get current directory of app.js (since Vercel runs serverless)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(bodyParser.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,8 +21,13 @@ app.use((req, res, next) => {
 });
 
 app.get("/meals", async (req, res) => {
-  const meals = await fs.readFile("./data/available-meals.json", "utf8");
-  res.json(JSON.parse(meals));
+  try {
+    const mealsPath = path.join(__dirname, "data", "available-meals.json");
+    const meals = await fs.readFile(mealsPath, "utf8");
+    res.json(JSON.parse(meals));
+  } catch (err) {
+    res.status(500).json({ message: "Could not read meals file." });
+  }
 });
 
 app.post("/orders", async (req, res) => {
@@ -28,11 +38,9 @@ app.post("/orders", async (req, res) => {
     orderData.items === null ||
     orderData.items.length === 0
   ) {
-    return res
-      .status(400)
-      .json({
-        message: orderData === null ? "Data Missing." : "Order Data Missing.",
-      });
+    return res.status(400).json({
+      message: orderData === null ? "Data Missing." : "Order Data Missing.",
+    });
   }
 
   if (Object.keys(orderData.customer)?.length === 0) {
@@ -57,23 +65,20 @@ app.post("/orders", async (req, res) => {
     });
   }
 
-  const newOrder = {
-    ...orderData,
-    id: (Math.random() * 1000).toString(),
-  };
-  const orders = await fs.readFile("./data/orders.json", "utf8");
-  const allOrders = JSON.parse(orders);
-  allOrders.push(newOrder);
-  await fs.writeFile("./data/orders.json", JSON.stringify(allOrders));
-  res.status(201).json({ message: "Order created!" });
-});
+  try {
+    const ordersPath = path.join(__dirname, "data", "orders.json");
+    const orders = await fs.readFile(ordersPath, "utf8");
+    const allOrders = JSON.parse(orders);
+    const newOrder = { ...orderData, id: (Math.random() * 1000).toString() };
 
-app.use((req, res) => {
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
+    allOrders.push(newOrder);
+    await fs.writeFile(ordersPath, JSON.stringify(allOrders));
+    res.status(201).json({ message: "Order created!" });
+  } catch (err) {
+    res.status(500).json({ message: "Could not save order." });
   }
-
-  res.status(404).json({ message: "Not found" });
 });
 
-app.listen(3000);
+// Remove app.listen for Vercel compatibility
+
+export default app; // 👈 Required for Vercel serverless function
