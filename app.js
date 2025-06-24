@@ -1,18 +1,25 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import path from "path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import bodyParser from "body-parser";
 
 const app = express();
 
-// Get current directory of app.js (since Vercel runs serverless)
+// Get current directory (important for Vercel serverless)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Parse JSON bodies
 app.use(bodyParser.json());
+
+// ✅ Serve static files from /public/images under /images route
+app.use("/images", express.static(path.join(__dirname, "public", "images")));
+
+// ✅ Optional: Serve other static assets from /public if needed
 app.use(express.static(path.join(__dirname, "public")));
 
+// CORS setup
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST");
@@ -20,6 +27,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// ✅ GET /meals
 app.get("/meals", async (req, res) => {
   try {
     const mealsPath = path.join(__dirname, "data", "available-meals.json");
@@ -30,34 +38,28 @@ app.get("/meals", async (req, res) => {
   }
 });
 
+// ✅ POST /orders
 app.post("/orders", async (req, res) => {
   const orderData = req.body.order;
 
-  if (
-    orderData === null ||
-    orderData.items === null ||
-    orderData.items.length === 0
-  ) {
+  if (!orderData || !orderData.items || orderData.items.length === 0) {
     return res.status(400).json({
       message: orderData === null ? "Data Missing." : "Order Data Missing.",
     });
   }
 
-  if (Object.keys(orderData.customer)?.length === 0) {
+  if (!orderData.customer || Object.keys(orderData.customer).length === 0) {
     return res.status(400).json({ message: "Customer Missing." });
   }
 
+  const { email, name, street, city, ["postal-code"]: postalCode } = orderData.customer;
+
   if (
-    orderData.customer.email === null ||
-    !orderData.customer.email.includes("@") ||
-    orderData.customer.name === null ||
-    orderData.customer.name.trim() === "" ||
-    orderData.customer.street === null ||
-    orderData.customer.street.trim() === "" ||
-    orderData.customer["postal-code"] === null ||
-    orderData.customer["postal-code"].trim() === "" ||
-    orderData.customer.city === null ||
-    orderData.customer.city.trim() === ""
+    !email?.includes("@") ||
+    !name?.trim() ||
+    !street?.trim() ||
+    !postalCode?.trim() ||
+    !city?.trim()
   ) {
     return res.status(400).json({
       message:
@@ -69,7 +71,7 @@ app.post("/orders", async (req, res) => {
     const ordersPath = path.join(__dirname, "data", "orders.json");
     const orders = await fs.readFile(ordersPath, "utf8");
     const allOrders = JSON.parse(orders);
-    const newOrder = { ...orderData, id: (Math.random() * 1000).toString() };
+    const newOrder = { ...orderData, id: Date.now().toString() };
 
     allOrders.push(newOrder);
     await fs.writeFile(ordersPath, JSON.stringify(allOrders));
@@ -79,6 +81,5 @@ app.post("/orders", async (req, res) => {
   }
 });
 
-// Remove app.listen for Vercel compatibility
-
-export default app; // 👈 Required for Vercel serverless function
+// ✅ Export for Vercel
+export default app;
