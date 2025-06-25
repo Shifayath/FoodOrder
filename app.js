@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import bodyParser from "body-parser";
-
+import { db } from "./db/firebaseAdmin.js";
 const app = express();
 
 // Get current directory (important for Vercel serverless)
@@ -67,17 +67,31 @@ app.post("/orders", async (req, res) => {
     });
   }
 
-  try {
-    const ordersPath = path.join(__dirname, "data", "orders.json");
-    const orders = await fs.readFile(ordersPath, "utf8");
-    const allOrders = JSON.parse(orders);
-    const newOrder = { ...orderData, id: Date.now().toString() };
+  // try {
+  //   const ordersPath = path.join(__dirname, "data", "orders.json");
+  //   const orders = await fs.readFile(ordersPath, "utf8");
+  //   const allOrders = JSON.parse(orders);
+  //   const newOrder = { ...orderData, id: Date.now().toString() };
 
-    allOrders.push(newOrder);
-    await fs.writeFile(ordersPath, JSON.stringify(allOrders));
-    res.status(201).json({ message: "Order created!" });
+  //   allOrders.push(newOrder);
+  //   await fs.writeFile(ordersPath, JSON.stringify(allOrders));
+    
+  //   res.status(201).json({ message: "Order created!" });
+  // } catch (err) {
+  //   res.status(500).json({ message: "Could not save order." });
+  // }
+
+   try {
+    const ordersRef = db.collection("orders");
+    const newOrderRef = await ordersRef.add({
+      ...orderData,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({ message: "Order created!", orderId: newOrderRef.id });
   } catch (err) {
-    res.status(500).json({ message: "Could not save order." });
+    console.error("Error writing to Firestore:", err);
+    res.status(500).json({ message: "Could not save order to Firestore." });
   }
 });
 
