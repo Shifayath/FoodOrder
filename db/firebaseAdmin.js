@@ -1,4 +1,6 @@
 import admin from "firebase-admin";
+import dotenv from "dotenv";
+dotenv.config(); // ✅ make sure this is called at top
 
 const serviceAccount = {
   projectId: process.env.GOOGLE_PROJECT_ID,

@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import bodyParser from "body-parser";
 import { db } from "./db/firebaseAdmin.js";
-import dotenv from "dotenv";
-dotenv.config();
+
 
 const app = express();
 
